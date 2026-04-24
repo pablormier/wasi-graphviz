@@ -1,0 +1,2 @@
+#!/bin/bash
+exec zig cc -target wasm32-wasi "$@"

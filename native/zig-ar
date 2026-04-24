@@ -1,0 +1,3 @@
+#!/bin/bash
+# zig ar wrapper - do NOT pass -target, ar doesn't accept it
+exec zig ar "$@"

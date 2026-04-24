@@ -1,0 +1,69 @@
+# macOS / editor noise
+.DS_Store
+._*
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version.local
+.venv/
+venv/
+env/
+.env
+.env.*
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+
+# Python packaging outputs
+dist/
+*.egg-info/
+build/lib/
+build/bdist.*/
+
+# Pixi environments
+.pixi/
+
+# WASM / native build artifacts
+build/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.wasm
+*.wat
+
+# Keep vendored package artifacts trackable when intentionally released.
+!src/wasi_graphviz/assets/
+!src/wasi_graphviz/assets/graphviz.wasm
+
+# CMake / Ninja generated files outside build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+Testing/
+*.ninja
+.ninja_*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+tmp/
+temp/

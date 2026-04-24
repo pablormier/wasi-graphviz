@@ -1,0 +1,20 @@
+[workspace]
+name = "wasi-graphviz"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[tasks]
+build-wasm = "python scripts/build_wasm.py"
+validate-wasm = "wasm-objdump -x build/graphviz.wasm"
+test = "pytest"
+
+[dependencies]
+python = ">=3.11"
+zig = "*"
+cmake = "*"
+ninja = "*"
+pkg-config = "*"
+wabt = "*"
+vcpkg = ">=2023.4.15,<2024"
+bison = ">=3.8.2,<4"
+flex = ">=2.6.4,<3"

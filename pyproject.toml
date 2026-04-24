@@ -1,0 +1,35 @@
+[project]
+name = "wasi-graphviz"
+version = "0.1.0a1"
+description = "Run Graphviz from Python via WebAssembly — no native binary required"
+readme = "README.md"
+authors = [
+    { name = "Pablo Rodriguez Mier", email = "pablo.rodriguez.mier@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+pywasm = ["pywasm>=2.2.2"]
+wasmtime = ["wasmtime>=44.0.0"]
+all = ["pywasm>=2.2.2", "wasmtime>=44.0.0"]
+test = ["pytest", "ruff"]
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+wasi-graphviz = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.15.11",
+]

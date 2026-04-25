@@ -1,7 +1,8 @@
 /* native/main.c — Plain C wrapper for Graphviz, targeting wasm32-wasi.
  *
  * Exposes a minimal C ABI:
- *   char* graphviz_render(const char* dot, const char* format, const char* engine);
+ *   char* graphviz_render(const char* dot, const char* format,
+ *                         const char* engine, size_t* out_len);
  *   const char* graphviz_last_error(void);
  *   const char* graphviz_version(void);
  *   void graphviz_free(char* ptr);
@@ -67,12 +68,14 @@ void graphviz_free(char* ptr)
     free(ptr);
 }
 
-char* graphviz_render(const char* dot, const char* format, const char* engine)
+char* graphviz_render(const char* dot, const char* format, const char* engine,
+                      size_t* out_len)
 {
     char* result = NULL;
     char* render_data = NULL;
     size_t render_len = 0;
 
+    if (out_len) *out_len = 0;
     last_error[0] = '\0';
 
     GVC_t* gvc = gvContextPlugins(lt_preloaded_symbols, 1);
@@ -106,12 +109,11 @@ char* graphviz_render(const char* dot, const char* format, const char* engine)
         return NULL;
     }
 
-    /* Copy render_data into a malloc'd string so the caller can free it. */
     if (render_data && render_len > 0) {
-        result = (char*)malloc(render_len + 1);
+        result = (char*)malloc(render_len);
         if (result) {
             memcpy(result, render_data, render_len);
-            result[render_len] = '\0';
+            if (out_len) *out_len = render_len;
         }
     }
 

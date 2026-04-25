@@ -202,6 +202,7 @@ build/graphviz-cmake/lib/edgepaint/libedgepaintlib.a
 EOF
 
 pixi run zig cc -target wasm32-wasi -O2 \
+  -Wl,-z,stack-size=2097152 \
   -Wl,--export=graphviz_render \
   -Wl,--export=graphviz_free \
   -Wl,--export=graphviz_last_error \
@@ -213,7 +214,17 @@ pixi run zig cc -target wasm32-wasi -O2 \
   @build/link_libs.txt
 ```
 
-### 7. Validate the artifact
+### 7. Strip and optimize
+
+Remove DWARF debug sections and run `wasm-opt -Oz` to shrink the artifact
+(typical reduction: ~5.8 MB → ~800 KB).
+
+```bash
+pixi run wasm-strip build/graphviz.wasm
+pixi run wasm-opt -Oz --strip-producers build/graphviz.wasm -o build/graphviz.wasm
+```
+
+### 8. Validate the artifact
 
 ```bash
 # Inspect imports/exports
@@ -230,7 +241,7 @@ done
 
 Expected: only `wasi_snapshot_preview1.*` imports, no Emscripten imports.
 
-### 8. Copy to package assets
+### 9. Copy to package assets
 
 ```bash
 cp build/graphviz.wasm src/wasi_graphviz/assets/graphviz.wasm

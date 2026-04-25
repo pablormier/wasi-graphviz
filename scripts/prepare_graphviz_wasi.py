@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: EPL-2.0
+#
+# The transforms encoded in this file are Modifications of the Graphviz
+# Program (https://graphviz.org/) within the meaning of the Eclipse Public
+# License, Version 2.0, and are distributed under EPL-2.0.  The rest of the
+# wasi-graphviz repository is licensed under Apache-2.0; see NOTICE.
 """Prepare a clean Graphviz source tree for wasm32-wasi cross-compilation.
 
 This script applies deterministic, version-tolerant transforms to the Graphviz

@@ -1,5 +1,6 @@
 """Wasmtime backend for wasi-graphviz."""
 
+import struct
 from pathlib import Path
 from typing import Union
 
@@ -36,70 +37,56 @@ class WasmtimeBackend:
         self._last_error_fn = self._instance.exports(self._store)["graphviz_last_error"]
 
     def _malloc(self, size: int) -> int:
-        """Allocate memory in the WASM heap."""
         return self._malloc_fn(self._store, size)
 
     def _free(self, addr: int) -> None:
-        """Free memory in the WASM heap."""
         self._free_fn(self._store, addr)
 
     def _write_string(self, text: str) -> int:
-        """Write a null-terminated UTF-8 string into WASM memory."""
         data = (text + "\x00").encode("utf-8")
         addr = self._malloc(len(data))
         self._mem.write(self._store, data, addr)
         return addr
 
-    def _read_string(self, addr: int, max_len: int = 65536) -> str:
-        """Read a null-terminated UTF-8 string from WASM memory."""
-        result = bytearray()
-        for i in range(addr, addr + max_len):
-            b = self._mem.read(self._store, i, i + 1)[0]
-            if b == 0:
-                break
-            result.append(b)
-        return result.decode("utf-8")
+    def _read_bytes(self, addr: int, length: int) -> bytes:
+        return bytes(self._mem.read(self._store, addr, addr + length))
+
+    def _read_cstring(self, addr: int, max_len: int = 4096) -> str:
+        buf = self._mem.read(self._store, addr, addr + max_len)
+        nul = buf.find(0)
+        if nul >= 0:
+            buf = buf[:nul]
+        return bytes(buf).decode("utf-8", errors="replace")
+
+    def _read_u32(self, addr: int) -> int:
+        return struct.unpack("<I", self._mem.read(self._store, addr, addr + 4))[0]
 
     def render(
         self, dot_source: str, *, format: str = "svg", engine: str = "dot"
     ) -> bytes:
-        """Render a DOT string to the requested format.
-
-        Parameters
-        ----------
-        dot_source:
-            The Graphviz DOT source string.
-        format:
-            Output format (e.g. ``svg``, ``png``, ``dot``).
-        engine:
-            Layout engine (e.g. ``dot``, ``neato``, ``circo``).
-
-        Returns
-        -------
-        bytes
-            The rendered output.
-
-        Raises
-        ------
-        RenderError
-            If the rendering fails.
-        """
+        """Render a DOT string to the requested format."""
         dot_ptr = self._write_string(dot_source)
         fmt_ptr = self._write_string(format)
         engine_ptr = self._write_string(engine)
+        out_len_ptr = self._malloc(4)
 
         try:
-            result_ptr = self._render_fn(self._store, dot_ptr, fmt_ptr, engine_ptr)
+            result_ptr = self._render_fn(
+                self._store, dot_ptr, fmt_ptr, engine_ptr, out_len_ptr
+            )
 
             if result_ptr == 0:
                 err_ptr = self._last_error_fn(self._store)
-                error = self._read_string(err_ptr)
+                error = self._read_cstring(err_ptr)
                 raise RenderError(error or "Graphviz rendering failed")
 
-            result = self._read_string(result_ptr)
-            self._free(result_ptr)
-            return result.encode("utf-8")
+            out_len = self._read_u32(out_len_ptr)
+            try:
+                return self._read_bytes(result_ptr, out_len)
+            finally:
+                self._free(result_ptr)
         finally:
             self._free(dot_ptr)
             self._free(fmt_ptr)
             self._free(engine_ptr)
+            self._free(out_len_ptr)

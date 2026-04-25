@@ -137,10 +137,27 @@ uv run ruff check .
 uv run ruff format .
 ```
 
-## License
+## License & attribution
 
-Apache-2.0
+The Python wrapper, C wrapper (`native/main.c`), and build scripts in this
+repository are licensed under **Apache-2.0** (see [`LICENSE`](LICENSE)).
+
+The wheel bundles a compiled build of [Graphviz](https://graphviz.org/),
+which is licensed under the **Eclipse Public License 2.0** (EPL-2.0).
+The full EPL-2.0 text is shipped inside the wheel at
+`wasi_graphviz/assets/GRAPHVIZ_LICENSE`. Source for the bundled Graphviz
+version is available upstream:
+<https://gitlab.com/graphviz/graphviz/-/tree/14.1.5>.
+
+Modifications applied to the Graphviz source before compilation are
+described in
+[`scripts/prepare_graphviz_wasi.py`](scripts/prepare_graphviz_wasi.py)
+and are themselves licensed under EPL-2.0. See [`NOTICE`](NOTICE) for the
+full attribution.
+
+> **wasi-graphviz is an unofficial repackaging and is not affiliated with
+> or endorsed by the Graphviz project.**
 
 ---
 
-**First functional v0.1.0a1** built with [Kimi](https://www.moonshot.cn/) · ~1h 30m · single session (81% context used) · total cost: ~$1
+First functional v0.1.0a1 built with [Kimi K2.6](https://www.moonshot.cn/) in ~1h, single session (81% context used). Total cost: ~$1

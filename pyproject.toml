@@ -1,10 +1,20 @@
 [project]
 name = "wasi-graphviz"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Run Graphviz from Python via WebAssembly — no native binary required"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [
     { name = "Pablo Rodriguez Mier", email = "pablo.rodriguez.mier@gmail.com" }
+]
+keywords = ["graphviz", "wasm", "wasi", "webassembly", "dot", "svg"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Software Development :: Libraries",
 ]
 requires-python = ">=3.11"
 dependencies = []

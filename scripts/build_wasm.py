@@ -225,6 +225,7 @@ def link_wasm() -> None:
             "-target",
             "wasm32-wasi",
             "-O2",
+            "-Wl,-z,stack-size=2097152",
             "-Wl,--export=graphviz_render",
             "-Wl,--export=graphviz_free",
             "-Wl,--export=graphviz_last_error",
@@ -235,6 +236,25 @@ def link_wasm() -> None:
             str(WASM_PATH),
             str(MAIN_OBJECT),
             f"@{LINK_LIBS_FILE}",
+        )
+    )
+
+
+def shrink_wasm() -> None:
+    run(pixi("wasm-strip", str(WASM_PATH)))
+    run(
+        pixi(
+            "wasm-opt",
+            "-Oz",
+            "--strip-producers",
+            "--enable-bulk-memory",
+            "--enable-bulk-memory-opt",
+            "--enable-nontrapping-float-to-int",
+            "--enable-sign-ext",
+            "--enable-mutable-globals",
+            str(WASM_PATH),
+            "-o",
+            str(WASM_PATH),
         )
     )
 
@@ -298,6 +318,7 @@ def main() -> None:
     build_static_libs()
     compile_wrapper(srcdir)
     link_wasm()
+    shrink_wasm()
     validate_wasm()
     vendor_wasm()
 

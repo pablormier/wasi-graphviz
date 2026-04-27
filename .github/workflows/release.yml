@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      graphviz_version:
+        description: "Graphviz version to bundle (e.g. 14.1.5)"
+        required: false
+        default: "14.1.5"
+      publish:
+        description: "Publish to PyPI (set to 'true' to push)"
+        required: false
+        default: "false"
+
+env:
+  GRAPHVIZ_VERSION: ${{ github.event.inputs.graphviz_version || '14.1.5' }}
+
+jobs:
+  build:
+    name: Build wasm + wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.67.2
+          cache: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Build graphviz.wasm
+        run: pixi run build-wasm --graphviz-version "${GRAPHVIZ_VERSION}"
+
+      - name: Confirm wasm vendored into package
+        run: |
+          test -f src/wasi_graphviz/assets/graphviz.wasm
+          ls -lh src/wasi_graphviz/assets/graphviz.wasm
+
+      - name: Run tests against built wasm
+        run: |
+          uv sync --all-extras
+          uv run pytest -q
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Show distribution
+        run: ls -lh dist/
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+      - name: Upload wasm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphviz-wasm-${{ env.GRAPHVIZ_VERSION }}
+          path: src/wasi_graphviz/assets/graphviz.wasm
+          if-no-files-found: error
+
+  github-release:
+    name: Attach to GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: graphviz-wasm-${{ env.GRAPHVIZ_VERSION }}
+          path: wasm
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+            wasm/graphviz.wasm
+          body: |
+            wasi-graphviz ${{ github.ref_name }}
+
+            Bundles Graphviz ${{ env.GRAPHVIZ_VERSION }} compiled to wasm32-wasi.
+
+            Install:
+            ```bash
+            pip install wasi-graphviz[all]==${{ github.ref_name }}
+            ```
+
+  pypi-publish:
+    name: Publish to PyPI
+    needs: build
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/wasi-graphviz
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

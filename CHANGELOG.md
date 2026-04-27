@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pywasm), `test_packaging` (vendored `graphviz.wasm` is opened via
   `importlib.resources`). Suite is now 26 tests.
 - `binaryen` added to `pixi.toml` for `wasm-opt`.
+- `pytest-benchmark` integration: `tests/test_benchmarks.py` compares
+  `wasmtime` vs `pywasm` across 10 / 100 / 400 edge graphs. Skipped by
+  default; opt in with `pytest -m perf --benchmark-only`. README now
+  carries published numbers (wasmtime ~0.3–7 ms vs pywasm ~3–130 s,
+  i.e. ~10⁴–10⁵× slower).
 - New `test.yml` GitHub Actions workflow runs ruff and pytest on
   push/PR across Python 3.11/3.12/3.13 and ubuntu/macos.
 

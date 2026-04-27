@@ -2,18 +2,86 @@
 
 Run Graphviz from Python via WebAssembly — no native Graphviz binary, no Node.js, no browser required.
 
+## Why this exists
+
+Rendering DOT graphs from Python sits in an awkward gap.
+
+- **Browser-based WASM renderers** like
+  [`@hpcc-js/wasm-graphviz`](https://github.com/hpcc-systems/hpcc-js-wasm)
+  ship Graphviz as a WebAssembly module — but it's an Emscripten build
+  wrapped in JavaScript glue, designed to run in a browser or Node.
+  Tools like [easydot](https://github.com/pablormier/easydot) wrap that
+  flow so you can call it from Python and display SVGs in a notebook,
+  but the renderer itself still ultimately needs a JS runtime / browser
+  surface to produce pixels — fine for interactive notebooks, awkward
+  for headless static SVG generation in CI, batch jobs, or server-side
+  pipelines.
+- **System-binary Python wrappers** like `graphviz` and `pygraphviz`
+  shell out to a system-installed `dot` or link against `libcgraph`.
+  That means every deployment target — laptops, CI runners, Lambda
+  functions, Docker base images — has to install Graphviz separately,
+  and your code has to spawn subprocesses or manage shared-library
+  loading.
+
+`wasi-graphviz` plugs the gap: a `wasm32-wasi` build of upstream
+Graphviz plus a thin Python wrapper. `pip install` is the entire
+install story, the wheel is ~440 KB, and rendering happens entirely
+in-process — no subprocesses, no system packages, no JS, no browser.
+Works the same in a notebook, a CI job, a serverless function, or an
+offline air-gapped environment.
+
+The wheel itself does **not** include a WASM runtime — that's an
+explicit choice (see [Installation](#installation) below) so you can
+pick the runtime that matches your deployment constraints.
+
 ## Installation
 
-```bash
-# Minimal install with pywasm (pure Python, slower)
-pip install wasi-graphviz[pywasm]
+`wasi-graphviz` needs a runtime to execute the bundled `graphviz.wasm`.
+Two are supported, picked via extras:
 
-# Recommended install with wasmtime (faster)
+```bash
+# Recommended for most users — fast native runtime
 pip install wasi-graphviz[wasmtime]
 
-# Install both backends
+# Pure-Python runtime — slow, but works anywhere Python does
+pip install wasi-graphviz[pywasm]
+
+# Install both — `render(..., backend="auto")` will prefer wasmtime
 pip install wasi-graphviz[all]
 ```
+
+### Choosing a backend
+
+|                  | `wasmtime`                                | `pywasm`                              |
+|------------------|-------------------------------------------|---------------------------------------|
+| Implementation   | Native runtime (Rust) with Python bindings | Pure-Python WASM interpreter          |
+| Speed            | ~0.3–7 ms per render (see below)          | ~3–130 s per render — *4–5 orders of magnitude slower* |
+| Install size     | ~15 MB wheel (compiled extensions)        | ~200 KB wheel                         |
+| Platforms        | Linux/macOS/Windows on x86_64 + arm64     | Anywhere CPython 3.11+ runs           |
+| Cold start       | Slightly heavier instantiation            | Fastest to import                     |
+| Use when…        | Production, CI, notebooks, anything performance-sensitive | Last-resort portability — Pyodide, exotic CPU/OS, no-native-deps environments |
+
+`backend="auto"` (the default) prefers `wasmtime` when available and
+silently falls back to `pywasm`, so most code can ignore the
+distinction. Force one explicitly when you have a reason — see
+[Backend selection](#backend-selection) below.
+
+#### Benchmarks
+
+Median wall time per render on Apple M-series, Python 3.11, measured
+via `pytest-benchmark` (run yourself with `uv run pytest
+tests/test_benchmarks.py -m perf --benchmark-only`):
+
+| Graph             | `wasmtime` | `pywasm`  | wasmtime speedup |
+|-------------------|-----------:|----------:|-----------------:|
+| 10 edges          |    0.29 ms |    3.7 s  |        ~12,800 × |
+| 100 edges         |    1.74 ms |   32.5 s  |        ~18,700 × |
+| 400 edges         |    6.86 ms |  133.3 s  |        ~19,400 × |
+
+`pywasm` is a pure-Python WASM interpreter, so the ratio is roughly
+"interpreted Python evaluating WASM bytecode" vs "native compiled
+code" — expect orders of magnitude, not factors. Use `wasmtime`
+unless your environment forbids native code.
 
 ## Quick start
 
@@ -44,16 +112,19 @@ output = render("digraph G { a -> b; }", format="dot")
 
 ### Backend selection
 
+See the [trade-off table](#choosing-a-backend) above for when to pick
+which.
+
 ```python
 from wasi_graphviz import render
 
 # Auto-select (prefer wasmtime, fall back to pywasm)
 svg = render("digraph G { a -> b; }", backend="auto")
 
-# Force pywasm (pure Python, works everywhere)
+# Force pywasm — pure Python, slow but maximally portable
 svg = render("digraph G { a -> b; }", backend="pywasm")
 
-# Force wasmtime (faster, requires compiled extension)
+# Force wasmtime — fast native runtime, requires compiled extension
 svg = render("digraph G { a -> b; }", backend="wasmtime")
 ```
 
@@ -129,12 +200,15 @@ pixi run cmake --build build/graphviz-cmake --parallel
 ## Development
 
 ```bash
-# Run tests
+# Run tests (perf benchmarks are skipped by default)
 uv run pytest
 
 # Format and lint
 uv run ruff check .
 uv run ruff format .
+
+# Run benchmarks comparing wasmtime vs pywasm across graph sizes
+uv run pytest tests/test_benchmarks.py -m perf --benchmark-only
 ```
 
 ## License & attribution

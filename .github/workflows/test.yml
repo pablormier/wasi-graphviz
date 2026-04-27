@@ -12,12 +12,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
@@ -30,5 +30,43 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
-      - name: Run tests
+      - name: Run tests (vendored wasm)
         run: uv run pytest -v
+
+  build-wasm:
+    name: Build wasm from source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.67.2
+          cache: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Build graphviz.wasm
+        run: pixi run build-wasm
+
+      - name: Confirm wasm built and vendored
+        run: |
+          test -f build/graphviz.wasm
+          test -f src/wasi_graphviz/assets/graphviz.wasm
+          ls -lh build/graphviz.wasm src/wasi_graphviz/assets/graphviz.wasm
+
+      - name: Run tests against freshly built wasm
+        run: |
+          uv sync --all-extras
+          uv run pytest -v
+
+      - name: Upload built wasm
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphviz-wasm-ci
+          path: build/graphviz.wasm
+          if-no-files-found: error

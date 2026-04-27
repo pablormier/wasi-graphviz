@@ -23,7 +23,7 @@ dependencies = []
 pywasm = ["pywasm>=2.2.2"]
 wasmtime = ["wasmtime>=44.0.0"]
 all = ["pywasm>=2.2.2", "wasmtime>=44.0.0"]
-test = ["pytest", "ruff"]
+test = ["pytest", "pytest-benchmark>=5", "ruff"]
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
@@ -41,5 +41,13 @@ wasi-graphviz = { path = ".", editable = true }
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "pytest-benchmark>=5",
     "ruff>=0.15.11",
+    "ipykernel>=6.29",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "perf: performance benchmarks (skipped by default; run with `pytest -m perf --benchmark-only`)",
+]
+addopts = "-m 'not perf'"

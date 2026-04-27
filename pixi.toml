@@ -3,6 +3,12 @@ name = "wasi-graphviz"
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
 
+[activation.env]
+# bison's compiled-in pkgdatadir bakes the absolute path of the pixi env at
+# install time, so a renamed/moved project dir breaks `bison` until reinstall.
+# Pin it to the live env path so builds survive directory renames.
+BISON_PKGDATADIR = "$PIXI_PROJECT_ROOT/.pixi/envs/default/share/bison"
+
 [tasks]
 build-wasm = "python scripts/build_wasm.py"
 validate-wasm = "wasm-objdump -x build/graphviz.wasm"

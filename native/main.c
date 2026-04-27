@@ -65,39 +65,47 @@ const char* graphviz_last_error(void)
 
 void graphviz_free(char* ptr)
 {
-    free(ptr);
+    if (ptr) gvFreeRenderData(ptr);
+}
+
+static GVC_t* g_gvc = NULL;
+
+static GVC_t* get_context(void)
+{
+    if (!g_gvc) {
+        g_gvc = gvContextPlugins(lt_preloaded_symbols, 1);
+        if (g_gvc) {
+            agseterr(AGERR);
+            agseterrf(viz_errorf);
+        }
+    }
+    return g_gvc;
 }
 
 char* graphviz_render(const char* dot, const char* format, const char* engine,
                       size_t* out_len)
 {
-    char* result = NULL;
     char* render_data = NULL;
     size_t render_len = 0;
 
     if (out_len) *out_len = 0;
     last_error[0] = '\0';
 
-    GVC_t* gvc = gvContextPlugins(lt_preloaded_symbols, 1);
+    GVC_t* gvc = get_context();
     if (!gvc) {
         strncpy(last_error, "Failed to create Graphviz context", sizeof(last_error) - 1);
         return NULL;
     }
 
-    agseterr(AGERR);
-    agseterrf(viz_errorf);
-
     Agraph_t* graph = agmemread(dot);
     if (!graph) {
         strncpy(last_error, "Failed to parse DOT source", sizeof(last_error) - 1);
-        gvFreeContext(gvc);
         return NULL;
     }
 
     if (gvLayout(gvc, graph, engine) != 0) {
         strncpy(last_error, "Layout failed", sizeof(last_error) - 1);
         agclose(graph);
-        gvFreeContext(gvc);
         return NULL;
     }
 
@@ -105,25 +113,14 @@ char* graphviz_render(const char* dot, const char* format, const char* engine,
         strncpy(last_error, "Render failed", sizeof(last_error) - 1);
         gvFreeLayout(gvc, graph);
         agclose(graph);
-        gvFreeContext(gvc);
         return NULL;
     }
 
-    if (render_data && render_len > 0) {
-        result = (char*)malloc(render_len);
-        if (result) {
-            memcpy(result, render_data, render_len);
-            if (out_len) *out_len = render_len;
-        }
-    }
-
-    gvFreeRenderData(render_data);
     gvFreeLayout(gvc, graph);
     agclose(graph);
-    gvFinalize(gvc);
-    gvFreeContext(gvc);
 
-    return result;
+    if (out_len) *out_len = render_len;
+    return render_data;
 }
 
 /* Dummy main to satisfy zig cc wasm32-wasi libc startup. */

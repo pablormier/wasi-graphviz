@@ -59,6 +59,9 @@ Testing/
 *.ninja
 .ninja_*
 
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
 # Logs and temporary files
 *.log
 *.tmp

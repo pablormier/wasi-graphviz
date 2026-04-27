@@ -60,7 +60,7 @@ CMAKE_FLAGS = [
     "-Dwith_ipsepcola=OFF",
     "-Dwith_cxx_api=OFF",
     "-Dwith_cxx_tests=OFF",
-    "-DCMAKE_BUILD_TYPE=Release",
+    "-DCMAKE_BUILD_TYPE=MinSizeRel",
 ]
 
 
@@ -198,7 +198,10 @@ def compile_wrapper(srcdir: Path) -> None:
             "cc",
             "-target",
             "wasm32-wasi",
-            "-O2",
+            "-Oz",
+            "-flto",
+            "-ffunction-sections",
+            "-fdata-sections",
             "-D_WASI_EMULATED_SIGNAL",
             *include_flags,
             "-c",
@@ -224,7 +227,9 @@ def link_wasm() -> None:
             "cc",
             "-target",
             "wasm32-wasi",
-            "-O2",
+            "-Oz",
+            "-flto",
+            "-Wl,--gc-sections",
             "-Wl,-z,stack-size=2097152",
             "-Wl,--export=graphviz_render",
             "-Wl,--export=graphviz_free",

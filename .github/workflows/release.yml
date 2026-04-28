@@ -17,6 +17,7 @@ on:
 
 env:
   GRAPHVIZ_VERSION: ${{ github.event.inputs.graphviz_version || '14.1.5' }}
+  PACKAGE_VERSION: ${{ replace(github.ref_name, 'v', '') }}
 
 jobs:
   build:
@@ -94,13 +95,13 @@ jobs:
             dist/*
             wasm/graphviz.wasm
           body: |
-            wasi-graphviz ${{ github.ref_name }}
+            wasi-graphviz ${{ env.PACKAGE_VERSION }}
 
             Bundles Graphviz ${{ env.GRAPHVIZ_VERSION }} compiled to wasm32-wasi.
 
             Install:
             ```bash
-            pip install wasi-graphviz[all]==${{ github.ref_name }}
+            pip install wasi-graphviz[all]==${{ env.PACKAGE_VERSION }}
             ```
 
   pypi-publish:

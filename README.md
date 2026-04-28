@@ -250,4 +250,4 @@ full attribution.
 
 ---
 
-First functional v0.1.0a1 built with [Kimi K2.6](https://www.moonshot.cn/) in ~1h, single session (81% context used). Total cost: ~$1
+First functional v0.1.0 built with [Kimi K2.6](https://www.moonshot.cn/) in ~1h, single session (81% context used). Total cost: ~$1

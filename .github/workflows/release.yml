@@ -17,7 +17,6 @@ on:
 
 env:
   GRAPHVIZ_VERSION: ${{ github.event.inputs.graphviz_version || '14.1.5' }}
-  PACKAGE_VERSION: ${{ replace(github.ref_name, 'v', '') }}
 
 jobs:
   build:
@@ -88,6 +87,10 @@ jobs:
           name: graphviz-wasm-${{ env.GRAPHVIZ_VERSION }}
           path: wasm
 
+      - name: Derive package version
+        id: version
+        run: echo "package_version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
@@ -95,13 +98,13 @@ jobs:
             dist/*
             wasm/graphviz.wasm
           body: |
-            wasi-graphviz ${{ env.PACKAGE_VERSION }}
+            wasi-graphviz ${{ steps.version.outputs.package_version }}
 
             Bundles Graphviz ${{ env.GRAPHVIZ_VERSION }} compiled to wasm32-wasi.
 
             Install:
             ```bash
-            pip install wasi-graphviz[all]==${{ env.PACKAGE_VERSION }}
+            pip install wasi-graphviz[all]==${{ steps.version.outputs.package_version }}
             ```
 
   pypi-publish:

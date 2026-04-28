@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the wheel as `wasi_graphviz/assets/GRAPHVIZ_LICENSE`, SPDX header
   on `scripts/prepare_graphviz_wasi.py` (the script's transforms are
   EPL-2.0 modifications of the Graphviz source).
-- `pyproject.toml` metadata: `license = "Apache-2.0"`,
+- `pyproject.toml` metadata: `license = "EPL-2.0"`,
   `license-files = ["LICENSE", "NOTICE"]`, keywords, and trove
   classifiers.
 - Tests: `test_large_graph` (regression for the 64 KB cap),

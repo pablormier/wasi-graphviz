@@ -66,7 +66,8 @@ def render(
         Which Python WASM runtime to use.
 
         - ``"auto"`` — prefer ``wasmtime``, fall back to ``pywasm``.
-        - ``"pywasm"`` — pure-Python backend (always works).
+        - ``"pywasm"`` — pure-Python backend (works on any CPython,
+          but not in Pyodide because it requires ``fcntl``).
         - ``"wasmtime"`` — faster native backend.
     wasm_path:
         Override the path to the ``graphviz.wasm`` artifact.

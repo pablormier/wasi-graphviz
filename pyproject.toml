@@ -3,8 +3,8 @@ name = "wasi-graphviz"
 version = "0.1.0a2"
 description = "Run Graphviz from Python via WebAssembly — no native binary required"
 readme = "README.md"
-license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license = "EPL-2.0"
+license-files = ["LICENSE", "NOTICE", "src/wasi_graphviz/assets/GRAPHVIZ_LICENSE"]
 authors = [
     { name = "Pablo Rodriguez Mier", email = "pablo.rodriguez.mier@gmail.com" }
 ]

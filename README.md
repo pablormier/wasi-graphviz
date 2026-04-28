@@ -43,7 +43,7 @@ Two are supported, picked via extras:
 # Recommended for most users — fast native runtime
 pip install wasi-graphviz[wasmtime]
 
-# Pure-Python runtime — slow, but works anywhere Python does
+# Pure-Python runtime — slow, but works anywhere CPython does (not Pyodide)
 pip install wasi-graphviz[pywasm]
 
 # Install both — `render(..., backend="auto")` will prefer wasmtime
@@ -57,14 +57,31 @@ pip install wasi-graphviz[all]
 | Implementation   | Native runtime (Rust) with Python bindings | Pure-Python WASM interpreter          |
 | Speed            | ~0.3–7 ms per render (see below)          | ~3–130 s per render — *4–5 orders of magnitude slower* |
 | Install size     | ~15 MB wheel (compiled extensions)        | ~200 KB wheel                         |
-| Platforms        | Linux/macOS/Windows on x86_64 + arm64     | Anywhere CPython 3.11+ runs           |
+| Platforms        | Linux/macOS/Windows on x86_64 + arm64     | Anywhere CPython 3.11+ runs (see Pyodide note below) |
 | Cold start       | Slightly heavier instantiation            | Fastest to import                     |
-| Use when…        | Production, CI, notebooks, anything performance-sensitive | Last-resort portability — Pyodide, exotic CPU/OS, no-native-deps environments |
+| Use when…        | Production, CI, notebooks, anything performance-sensitive | Last-resort portability — exotic CPU/OS, no-native-deps environments |
 
 `backend="auto"` (the default) prefers `wasmtime` when available and
 silently falls back to `pywasm`, so most code can ignore the
 distinction. Force one explicitly when you have a reason — see
 [Backend selection](#backend-selection) below.
+
+> **Pyodide / marimo / WebAssembly-based Python environments**
+>
+> `pywasm` is pure-Python, but it imports `fcntl` (for stdin handling)
+> which is **not available in Pyodide** because Pyodide itself runs
+> inside a browser WebAssembly sandbox that lacks POSIX file-control
+> APIs.
+>
+> Neither backend works in Pyodide today. A future
+> `browser` / `pyodide` backend (using the browser's native
+> `WebAssembly` object + a WASI polyfill) is possible, but not yet
+> implemented.
+>
+> If you need Graphviz in a Pyodide or marimo notebook, use
+> [`easydot`](https://github.com/pablormier/easydot) instead — it wraps
+> the browser's `@hpcc-js/wasm` renderer and works out of the box in
+> those environments.
 
 #### Benchmarks
 
@@ -213,12 +230,11 @@ uv run pytest tests/test_benchmarks.py -m perf --benchmark-only
 
 ## License & attribution
 
-The Python wrapper, C wrapper (`native/main.c`), and build scripts in this
-repository are licensed under **Apache-2.0** (see [`LICENSE`](LICENSE)).
+This package is licensed under the **Eclipse Public License 2.0**
+(EPL-2.0). See [`LICENSE`](LICENSE) for the full text.
 
-The wheel bundles a compiled build of [Graphviz](https://graphviz.org/),
-which is licensed under the **Eclipse Public License 2.0** (EPL-2.0).
-The full EPL-2.0 text is shipped inside the wheel at
+The wheel bundles a compiled build of [Graphviz](https://graphviz.org/)
+(also EPL-2.0). The full EPL-2.0 text is also shipped inside the wheel at
 `wasi_graphviz/assets/GRAPHVIZ_LICENSE`. Source for the bundled Graphviz
 version is available upstream:
 <https://gitlab.com/graphviz/graphviz/-/tree/14.1.5>.

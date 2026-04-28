@@ -1,8 +1,8 @@
 wasi-graphviz
 Copyright 2025-2026 Pablo Rodriguez Mier
 
-This product is licensed under the Apache License, Version 2.0
-(see LICENSE).
+This product is licensed under the Eclipse Public License, Version 2.0
+(EPL-2.0). See LICENSE for the full text.
 
 ------------------------------------------------------------------------
 Bundled third-party software
@@ -10,8 +10,7 @@ Bundled third-party software
 
 This product bundles a compiled build of Graphviz (https://graphviz.org/),
 which is licensed under the Eclipse Public License, Version 2.0 (EPL-2.0).
-
-The full EPL-2.0 license text ships with the wheel as
+The full EPL-2.0 text ships with the wheel as
     src/wasi_graphviz/assets/GRAPHVIZ_LICENSE
 
 Source code for the bundled Graphviz version is available upstream at:
@@ -19,10 +18,7 @@ Source code for the bundled Graphviz version is available upstream at:
 
 Modifications applied to the Graphviz source before compilation are
 described in scripts/prepare_graphviz_wasi.py and are themselves
-licensed under EPL-2.0. The remaining files in this repository
-(Python wrapper, C wrapper in native/main.c, build scripts) are
-separately developed works that use the Program and are licensed
-under Apache-2.0.
+licensed under EPL-2.0.
 
 wasi-graphviz is an unofficial repackaging and is not affiliated with
 or endorsed by the Graphviz project.

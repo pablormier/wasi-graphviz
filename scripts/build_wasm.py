@@ -64,50 +64,10 @@ CMAKE_FLAGS = [
 ]
 
 
-WRAPPER_INCLUDE_DIRS = [
-    "lib/gvc",
-    "lib/cgraph",
-    "lib/cdt",
-    "lib/common",
-    "lib/pathplan",
-    "lib/util",
-    "lib/ast",
-    "lib/xdot",
-    "lib/pack",
-    "lib/label",
-    "lib/neatogen",
-]
-
-
-LINK_LIBS = [
-    "plugin/core/libgvplugin_core.a",
-    "plugin/dot_layout/libgvplugin_dot_layout.a",
-    "plugin/neato_layout/libgvplugin_neato_layout.a",
-    "plugin/vt/libgvplugin_vt.a",
-    "lib/dotgen/libdotgen.a",
-    "lib/neatogen/libneatogen.a",
-    "lib/fdpgen/libfdpgen.a",
-    "lib/sfdpgen/libsfdpgen.a",
-    "lib/twopigen/libtwopigen.a",
-    "lib/circogen/libcircogen.a",
-    "lib/osage/libosage.a",
-    "lib/patchwork/libpatchwork.a",
-    "lib/ortho/libortho.a",
-    "lib/sparse/libsparse.a",
-    "lib/gvc/libgvc.a",
-    "lib/common/libcommon.a",
-    "lib/pack/libpack.a",
-    "lib/label/liblabel.a",
-    "lib/xdot/libxdot.a",
-    "lib/pathplan/libpathplan.a",
-    "lib/cgraph/libcgraph.a",
-    "lib/cdt/libcdt.a",
-    "lib/util/libutil.a",
-    "lib/ast/libast.a",
-    "lib/rbtree/librbtree.a",
-    "lib/sfio/libsfio.a",
-    "lib/edgepaint/libedgepaintlib.a",
-]
+# Include dirs and static libs are discovered dynamically after the CMake build
+# so that version bumps that add, remove, or rename internal libraries/headers
+# don't require manual updates here.  --gc-sections strips unused code, so
+# linking all .a files is safe.
 
 
 def run(cmd: list[str]) -> None:
@@ -187,9 +147,8 @@ def build_static_libs() -> None:
 
 
 def compile_wrapper(srcdir: Path) -> None:
-    include_flags = []
-    for include_dir in WRAPPER_INCLUDE_DIRS:
-        include_flags.extend(["-I", str(srcdir / include_dir)])
+    lib_subdirs = sorted(p for p in (srcdir / "lib").iterdir() if p.is_dir())
+    include_flags = [flag for d in lib_subdirs for flag in ("-I", str(d))]
     include_flags.extend(["-I", str(CMAKE_BUILD_DIR)])
 
     run(
@@ -214,9 +173,11 @@ def compile_wrapper(srcdir: Path) -> None:
 
 def write_link_libs_file() -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    LINK_LIBS_FILE.write_text(
-        "".join(f"{CMAKE_BUILD_DIR / lib}\n" for lib in LINK_LIBS)
-    )
+    libs = sorted(CMAKE_BUILD_DIR.rglob("*.a"))
+    if not libs:
+        raise RuntimeError(f"No .a files found under {CMAKE_BUILD_DIR} — did the CMake build succeed?")
+    print(f"Linking {len(libs)} static libraries")
+    LINK_LIBS_FILE.write_text("".join(f"{lib}\n" for lib in libs))
 
 
 def link_wasm() -> None:

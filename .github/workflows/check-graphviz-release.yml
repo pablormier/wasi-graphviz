@@ -1,0 +1,98 @@
+name: Check for new Graphviz release
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest Graphviz release from GitLab
+        id: latest
+        run: |
+          LATEST=$(curl -sf "https://gitlab.com/api/v4/projects/graphviz%2Fgraphviz/releases" \
+            | python3 -c "
+          import sys, json
+          releases = json.load(sys.stdin)
+          # tag_name may be '14.1.5' or 'v14.1.5' — strip leading v
+          print(releases[0]['tag_name'].lstrip('v'))
+          ")
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Get current bundled version
+        id: current
+        run: |
+          CURRENT=$(python3 -c "
+          import ast, pathlib
+          src = pathlib.Path('scripts/build_wasm.py').read_text()
+          for line in src.splitlines():
+              if line.startswith('GRAPHVIZ_VERSION'):
+                  print(ast.literal_eval(line.split('=', 1)[1].strip()))
+                  break
+          ")
+          echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+
+      - name: Check if update is needed
+        id: compare
+        run: |
+          LATEST="${{ steps.latest.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+          echo "Latest upstream: $LATEST"
+          echo "Currently bundled: $CURRENT"
+          if [ "$LATEST" != "$CURRENT" ]; then
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+            echo "Already up to date."
+          fi
+
+      - name: Bump version in source files
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          LATEST="${{ steps.latest.outputs.version }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+          python3 - <<'EOF'
+          import pathlib, os
+          latest = os.environ["LATEST"]
+          current = os.environ["CURRENT"]
+          for path in ["scripts/build_wasm.py", ".github/workflows/release.yml"]:
+              p = pathlib.Path(path)
+              p.write_text(p.read_text().replace(current, latest))
+          EOF
+        env:
+          LATEST: ${{ steps.latest.outputs.version }}
+          CURRENT: ${{ steps.current.outputs.version }}
+
+      - name: Open pull request
+        if: steps.compare.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          # Use a PAT so the PR triggers CI workflows (GITHUB_TOKEN cannot do this).
+          # Create a fine-grained PAT with Contents + Pull Requests write access
+          # and store it as a repository secret named GH_PAT.
+          token: ${{ secrets.GH_PAT }}
+          branch: bump/graphviz-${{ steps.latest.outputs.version }}
+          commit-message: "chore: bump bundled Graphviz ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }}"
+          title: "chore: bump bundled Graphviz ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }}"
+          body: |
+            Automated version bump of the bundled Graphviz wasm artifact.
+
+            | | Version |
+            |---|---|
+            | **Before** | `${{ steps.current.outputs.version }}` |
+            | **After** | `${{ steps.latest.outputs.version }}` |
+
+            **Release notes:** https://gitlab.com/graphviz/graphviz/-/releases/${{ steps.latest.outputs.version }}
+
+            ---
+
+            CI will compile the new version from source (`build-wasm` job) and run the full
+            test suite against it. Merge once green.
+          labels: dependencies

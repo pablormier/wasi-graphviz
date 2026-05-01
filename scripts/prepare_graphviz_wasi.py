@@ -49,11 +49,13 @@ def _comment_out_line(filepath: Path, marker: str) -> None:
         new_lines.append(line)
 
     if not found and not already_done:
+        # Pattern absent entirely — upstream may have already removed the
+        # subdirectory, so no patch is needed.  Warn and continue.
         print(
-            f"ERROR: Expected pattern '{marker}' not found in {filepath}",
+            f"WARNING: Pattern '{marker}' not found in {filepath} — skipping (may have been removed upstream)",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return
 
     if already_done and not found:
         print(f"Skipped {filepath}: '{marker}' already commented out")

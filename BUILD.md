@@ -33,7 +33,7 @@ pixi install
 pixi run build-wasm
 ```
 
-This downloads Graphviz 14.1.5 when needed, prepares the source tree, configures
+This downloads Graphviz 15.0.0 when needed, prepares the source tree, configures
 CMake for `wasm32-wasi`, builds the static libraries, links `build/graphviz.wasm`,
 validates the exports/imports, and copies the artifact to
 `src/wasi_graphviz/assets/graphviz.wasm`.
@@ -44,7 +44,7 @@ Useful options:
 # Re-extract source and recreate the CMake build directory
 pixi run build-wasm --force
 
-# Use an existing build/src/graphviz-14.1.5 source tree; do not download
+# Use an existing build/src/graphviz-15.0.0 source tree; do not download
 pixi run build-wasm --skip-download
 ```
 
@@ -55,7 +55,7 @@ The scripted task above follows these steps.
 ### 1. Download Graphviz source
 
 ```bash
-GRAPHVIZ_VERSION="14.1.5"
+GRAPHVIZ_VERSION="15.0.0"
 mkdir -p build/src
 curl -L -o build/src/graphviz.tar.gz \
   "https://gitlab.com/graphviz/graphviz/-/archive/${GRAPHVIZ_VERSION}/graphviz-${GRAPHVIZ_VERSION}.tar.gz"
@@ -127,7 +127,7 @@ pixi run cmake \
 | Flag | Reason |
 |------|--------|
 | `-DCMAKE_TOOLCHAIN_FILE=...` | Cross-compiles to wasm32-wasi using zig |
-| `-DGVPLUGIN_CURRENT=8 -DGVPLUGIN_REVISION=0` | Fixes Graphviz 14.1.5 plugin version regression |
+| `-DGVPLUGIN_CURRENT=8 -DGVPLUGIN_REVISION=0` | Provides plugin version values when Graphviz CMake does not |
 | `-DBUILD_SHARED_LIBS=OFF` | Static libraries only |
 | `-Dwith_ipsepcola=OFF` | Removes `vpsc` C++ code with WASI-incompatible `std::ofstream` |
 | `-DWITH_QUARTZ=OFF` | Prevents macOS host from auto-building Quartz plugin |

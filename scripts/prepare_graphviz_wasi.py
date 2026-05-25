@@ -11,7 +11,7 @@ source before CMake configure.  It is the last resort in the compatibility
 strategy after CMake options, toolchain flags, and injected headers.
 
 Usage:
-    python scripts/prepare_graphviz_wasi.py build/src/graphviz-14.1.5
+    python scripts/prepare_graphviz_wasi.py build/src/graphviz-15.0.0
 
 Rules:
 - The script must be idempotent.

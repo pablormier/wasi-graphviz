@@ -14,7 +14,7 @@ The full EPL-2.0 text ships with the wheel as
     src/wasi_graphviz/assets/GRAPHVIZ_LICENSE
 
 Source code for the bundled Graphviz version is available upstream at:
-    https://gitlab.com/graphviz/graphviz/-/tree/14.1.5
+    https://gitlab.com/graphviz/graphviz/-/tree/15.0.0
 
 Modifications applied to the Graphviz source before compilation are
 described in scripts/prepare_graphviz_wasi.py and are themselves

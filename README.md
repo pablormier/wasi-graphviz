@@ -184,7 +184,7 @@ The core plugin supports:
 The project consists of three layers:
 
 1. **WASM artifact** (`graphviz.wasm`)
-   - Graphviz 14.1.5 compiled for `wasm32-wasi`
+   - Graphviz 15.0.0 compiled for `wasm32-wasi`
    - Exposes a plain C ABI: `graphviz_render`, `graphviz_free`, `graphviz_last_error`, `graphviz_version`
    - No Emscripten, no JS glue
 
@@ -206,8 +206,8 @@ Quick summary:
 pixi install
 
 # Build the WASM artifact
-python scripts/prepare_graphviz_wasi.py build/src/graphviz-14.1.5
-pixi run cmake -S build/src/graphviz-14.1.5 -B build/graphviz-cmake \
+python scripts/prepare_graphviz_wasi.py build/src/graphviz-15.0.0
+pixi run cmake -S build/src/graphviz-15.0.0 -B build/graphviz-cmake \
   -DCMAKE_TOOLCHAIN_FILE=$(pwd)/native/wasm32-wasi-toolchain.cmake \
   ...
 pixi run cmake --build build/graphviz-cmake --parallel
@@ -237,7 +237,7 @@ The wheel bundles a compiled build of [Graphviz](https://graphviz.org/)
 (also EPL-2.0). The full EPL-2.0 text is also shipped inside the wheel at
 `wasi_graphviz/assets/GRAPHVIZ_LICENSE`. Source for the bundled Graphviz
 version is available upstream:
-<https://gitlab.com/graphviz/graphviz/-/tree/14.1.5>.
+<https://gitlab.com/graphviz/graphviz/-/tree/15.0.0>.
 
 Modifications applied to the Graphviz source before compilation are
 described in

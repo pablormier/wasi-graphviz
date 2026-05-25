@@ -7,16 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       graphviz_version:
-        description: "Graphviz version to bundle (e.g. 14.1.5)"
+        description: "Graphviz version to bundle (e.g. 15.0.0)"
         required: false
-        default: "14.1.5"
+        default: "15.0.0"
       publish:
         description: "Publish to PyPI (set to 'true' to push)"
         required: false
         default: "false"
 
 env:
-  GRAPHVIZ_VERSION: ${{ github.event.inputs.graphviz_version || '14.1.5' }}
+  GRAPHVIZ_VERSION: ${{ github.event.inputs.graphviz_version || '15.0.0' }}
 
 jobs:
   build:

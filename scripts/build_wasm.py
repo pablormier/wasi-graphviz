@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 
-GRAPHVIZ_VERSION = "14.1.5"
+GRAPHVIZ_VERSION = "15.0.0"
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_DIR = ROOT / "build"

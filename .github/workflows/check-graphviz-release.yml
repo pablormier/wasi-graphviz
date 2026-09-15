@@ -1,18 +1,32 @@
-name: Check for new Graphviz release
+name: Automatically release new Graphviz versions
 
 on:
   schedule:
     - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
   workflow_dispatch:
 
+concurrency:
+  group: automatic-graphviz-release
+  cancel-in-progress: false
+
 jobs:
-  check-release:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
     steps:
+      - name: Create release GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
 
       - name: Get latest Graphviz release from GitLab
         id: latest
@@ -41,9 +55,10 @@ jobs:
 
       - name: Check if update is needed
         id: compare
+        env:
+          LATEST: ${{ steps.latest.outputs.version }}
+          CURRENT: ${{ steps.current.outputs.version }}
         run: |
-          LATEST="${{ steps.latest.outputs.version }}"
-          CURRENT="${{ steps.current.outputs.version }}"
           echo "Latest upstream: $LATEST"
           echo "Currently bundled: $CURRENT"
           if [ "$LATEST" != "$CURRENT" ]; then
@@ -53,46 +68,99 @@ jobs:
             echo "Already up to date."
           fi
 
-      - name: Bump version in source files
+      - name: Install pixi
         if: steps.compare.outputs.needs_update == 'true'
-        run: |
-          LATEST="${{ steps.latest.outputs.version }}"
-          CURRENT="${{ steps.current.outputs.version }}"
-          python3 - <<'EOF'
-          import pathlib, os
-          latest = os.environ["LATEST"]
-          current = os.environ["CURRENT"]
-          for path in ["scripts/build_wasm.py", ".github/workflows/release.yml"]:
-              p = pathlib.Path(path)
-              p.write_text(p.read_text().replace(current, latest))
-          EOF
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.67.2
+          cache: true
+
+      - name: Install uv
+        if: steps.compare.outputs.needs_update == 'true'
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Prepare patch release
+        if: steps.compare.outputs.needs_update == 'true'
+        id: prepare
         env:
           LATEST: ${{ steps.latest.outputs.version }}
-          CURRENT: ${{ steps.current.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
 
-      - name: Open pull request
+          latest = os.environ["LATEST"]
+          if not re.fullmatch(r"\d+\.\d+\.\d+", latest):
+              raise SystemExit(f"Unexpected Graphviz release version: {latest!r}")
+
+          pyproject = Path("pyproject.toml")
+          pyproject_text = pyproject.read_text()
+          match = re.search(r'(?m)^version = "(\d+\.\d+\.\d+)"$', pyproject_text)
+          if match is None:
+              raise SystemExit("Could not find the package version in pyproject.toml")
+
+          major, minor, patch = (int(part) for part in match.group(1).split("."))
+          package_version = f"{major}.{minor}.{patch + 1}"
+          pyproject.write_text(
+              pyproject_text[:match.start(1)]
+              + package_version
+              + pyproject_text[match.end(1):]
+          )
+
+          build_script = Path("scripts/build_wasm.py")
+          build_text, replacements = re.subn(
+              r'(?m)^GRAPHVIZ_VERSION = "[^"]+"$',
+              f'GRAPHVIZ_VERSION = "{latest}"',
+              build_script.read_text(),
+              count=1,
+          )
+          if replacements != 1:
+              raise SystemExit("Could not update GRAPHVIZ_VERSION in scripts/build_wasm.py")
+          build_script.write_text(build_text)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"package_version={package_version}\n")
+          print(f"Preparing wasi-graphviz {package_version} with Graphviz {latest}")
+          PY
+
+      - name: Update lockfile
         if: steps.compare.outputs.needs_update == 'true'
-        uses: peter-evans/create-pull-request@v7
-        with:
-          # Use a PAT so the PR triggers CI workflows (GITHUB_TOKEN cannot do this).
-          # Create a fine-grained PAT with Contents + Pull Requests write access
-          # and store it as a repository secret named GH_PAT.
-          token: ${{ secrets.GH_PAT }}
-          branch: bump/graphviz-${{ steps.latest.outputs.version }}
-          commit-message: "chore: bump bundled Graphviz ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }}"
-          title: "chore: bump bundled Graphviz ${{ steps.current.outputs.version }} → ${{ steps.latest.outputs.version }}"
-          body: |
-            Automated version bump of the bundled Graphviz wasm artifact.
+        run: uv lock
 
-            | | Version |
-            |---|---|
-            | **Before** | `${{ steps.current.outputs.version }}` |
-            | **After** | `${{ steps.latest.outputs.version }}` |
+      - name: Build the new WASM artifact
+        if: steps.compare.outputs.needs_update == 'true'
+        env:
+          LATEST: ${{ steps.latest.outputs.version }}
+        run: pixi run build-wasm --graphviz-version "$LATEST"
 
-            **Release notes:** https://gitlab.com/graphviz/graphviz/-/releases/${{ steps.latest.outputs.version }}
+      - name: Run lint and tests
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          uv sync --all-extras
+          uv run ruff check .
+          uv run pytest -q
 
-            ---
+      - name: Build distribution as a release preflight
+        if: steps.compare.outputs.needs_update == 'true'
+        run: uv build
 
-            CI will compile the new version from source (`build-wasm` job) and run the full
-            test suite against it. Merge once green.
-          labels: dependencies
+      - name: Commit and tag the tested release
+        if: steps.compare.outputs.needs_update == 'true'
+        env:
+          PACKAGE_VERSION: ${{ steps.prepare.outputs.package_version }}
+          GRAPHVIZ_VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            pyproject.toml \
+            uv.lock \
+            scripts/build_wasm.py \
+            src/wasi_graphviz/assets/graphviz.wasm
+          git commit -m "release: wasi-graphviz $PACKAGE_VERSION (Graphviz $GRAPHVIZ_VERSION)"
+          git tag -a "v$PACKAGE_VERSION" -m "wasi-graphviz $PACKAGE_VERSION"
+
+          git push --atomic origin HEAD:main "v$PACKAGE_VERSION"

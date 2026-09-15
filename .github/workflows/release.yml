@@ -9,21 +9,38 @@ on:
       graphviz_version:
         description: "Graphviz version to bundle (e.g. 15.1.0)"
         required: false
-        default: "15.1.0"
       publish:
         description: "Publish to PyPI (set to 'true' to push)"
         required: false
         default: "false"
 
-env:
-  GRAPHVIZ_VERSION: ${{ github.event.inputs.graphviz_version || '15.1.0' }}
-
 jobs:
   build:
     name: Build wasm + wheel
     runs-on: ubuntu-latest
+    outputs:
+      graphviz_version: ${{ steps.graphviz_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine Graphviz version
+        id: graphviz_version
+        env:
+          GRAPHVIZ_INPUT: ${{ github.event.inputs.graphviz_version || '' }}
+        run: |
+          if [ -n "$GRAPHVIZ_INPUT" ]; then
+            VERSION="$GRAPHVIZ_INPUT"
+          else
+            VERSION=$(python3 -c "
+          import ast, pathlib
+          src = pathlib.Path('scripts/build_wasm.py').read_text()
+          for line in src.splitlines():
+              if line.startswith('GRAPHVIZ_VERSION'):
+                  print(ast.literal_eval(line.split('=', 1)[1].strip()))
+                  break
+          ")
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install pixi
         uses: prefix-dev/setup-pixi@v0.9.4
@@ -37,7 +54,7 @@ jobs:
           enable-cache: true
 
       - name: Build graphviz.wasm
-        run: pixi run build-wasm --graphviz-version "${GRAPHVIZ_VERSION}"
+        run: pixi run build-wasm --graphviz-version "${{ steps.graphviz_version.outputs.version }}"
 
       - name: Confirm wasm vendored into package
         run: |
@@ -65,7 +82,7 @@ jobs:
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: graphviz-wasm-${{ env.GRAPHVIZ_VERSION }}
+          name: graphviz-wasm-${{ steps.graphviz_version.outputs.version }}
           path: src/wasi_graphviz/assets/graphviz.wasm
           if-no-files-found: error
 
@@ -84,7 +101,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: graphviz-wasm-${{ env.GRAPHVIZ_VERSION }}
+          name: graphviz-wasm-${{ needs.build.outputs.graphviz_version }}
           path: wasm
 
       - name: Derive package version
@@ -100,7 +117,7 @@ jobs:
           body: |
             wasi-graphviz ${{ steps.version.outputs.package_version }}
 
-            Bundles Graphviz ${{ env.GRAPHVIZ_VERSION }} compiled to wasm32-wasi.
+            Bundles Graphviz ${{ needs.build.outputs.graphviz_version }} compiled to wasm32-wasi.
 
             Install:
             ```bash

@@ -228,6 +228,21 @@ uv run ruff format .
 uv run pytest tests/test_benchmarks.py -m perf --benchmark-only
 ```
 
+## Automated releases
+
+The scheduled Graphviz update workflow creates a patch release only after the
+new WASM build, linting, tests, and package build succeed. It authenticates
+its commit and tag push with a short-lived GitHub App installation token.
+
+To enable it for a repository, install a GitHub App with **Contents: Read and
+write** access and configure:
+
+- repository variable `RELEASE_APP_CLIENT_ID` with the App's client ID;
+- repository secret `RELEASE_APP_PRIVATE_KEY` with the App's private key.
+
+The App must be installed on this repository. No personal access token is
+required.
+
 ## License & attribution
 
 This package is licensed under the **Eclipse Public License 2.0**

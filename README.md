@@ -127,6 +127,41 @@ svg = render("graph G { a -- b; }", engine="neato")
 output = render("digraph G { a -> b; }", format="dot")
 ```
 
+### Rendering graphs with image assets
+
+Pass image files as bytes with portable relative names. Graphviz sees these
+files under the guest path `/assets`; it cannot read arbitrary files from the
+host. Use ASCII letters, digits, `.`, `_`, `-`, and `/` in asset names.
+
+```python
+from pathlib import Path
+from wasi_graphviz import render
+
+glyph = Path("glyph.svg").read_bytes()
+dot = '''digraph G {
+    node [shape=none, image="/assets/glyph.svg", label=""]
+    glyph
+}'''
+svg = render(dot, assets={"glyph.svg": glyph}, backend="pywasm")
+```
+
+With this WASM build, SVG image files should start with an XML declaration
+(`<?xml version="1.0" encoding="UTF-8"?>`) so Graphviz recognizes their
+dimensions.
+
+`assets` works with `auto`, `wasmtime`, and `pywasm`. For SVG output,
+referenced `.svg`, `.png`, `.gif`, `.jpg`, `.jpeg`, and `.jpe` files are
+embedded as data URIs, so the returned graph remains usable after the
+temporary files are removed. Only referenced image files need one of these
+extensions; unused files such as metadata can use other names. A referenced
+image with no supported suffix raises `ValueError` because Graphviz and the SVG
+output need its image type. Embedding applies to Graphviz format selectors
+whose base is `svg` or `svg_inline`, including `svg:svg:core` and
+`svg_inline:svg:core`. If `imagepath` points to `/assets` or one of its
+subdirectories, relative `image` paths are embedded when they uniquely match a
+supplied asset. If a relative image path matches multiple supplied files, use
+an explicit path such as `image="/assets/icons/glyph.svg"` to identify it.
+
 ### Backend selection
 
 See the [trade-off table](#choosing-a-backend) above for when to pick

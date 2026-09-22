@@ -1,13 +1,26 @@
 """Wasmtime backend for wasi-graphviz."""
 
 import struct
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
 import wasmtime
 
 from wasi_graphviz._constants import PACKAGE_WASM_PATH
+from wasi_graphviz._assets import embed_svg_assets, is_svg_output_format, staged_assets
 from wasi_graphviz._exceptions import RenderError
+
+
+@dataclass
+class _Session:
+    store: wasmtime.Store
+    memory: wasmtime.Memory
+    render_fn: object
+    free_fn: object
+    malloc_fn: object
+    last_error_fn: object
 
 
 class WasmtimeBackend:
@@ -19,74 +32,113 @@ class WasmtimeBackend:
             raise FileNotFoundError(f"WASM file not found: {self.wasm_path}")
 
         self._engine = wasmtime.Engine()
-        self._store = wasmtime.Store(self._engine)
         self._module = wasmtime.Module.from_file(self._engine, str(self.wasm_path))
+        self._session = self._create_session()
 
+    def _create_session(self, asset_dir: Path | None = None) -> _Session:
+        store = wasmtime.Store(self._engine)
         linker = wasmtime.Linker(self._engine)
         linker.define_wasi()
 
         wasi_config = wasmtime.WasiConfig()
         wasi_config.inherit_stdout()
-        self._store.set_wasi(wasi_config)
+        if asset_dir is not None:
+            wasi_config.preopen_dir(
+                str(asset_dir),
+                "/assets",
+                dir_perms=wasmtime.DirPerms.READ_ONLY,
+                file_perms=wasmtime.FilePerms.READ_ONLY,
+            )
+        store.set_wasi(wasi_config)
 
-        self._instance = linker.instantiate(self._store, self._module)
-        self._mem = self._instance.exports(self._store)["memory"]
-        self._render_fn = self._instance.exports(self._store)["graphviz_render"]
-        self._free_fn = self._instance.exports(self._store)["graphviz_free"]
-        self._malloc_fn = self._instance.exports(self._store)["malloc"]
-        self._last_error_fn = self._instance.exports(self._store)["graphviz_last_error"]
+        instance = linker.instantiate(store, self._module)
+        exports = instance.exports(store)
+        return _Session(
+            store=store,
+            memory=exports["memory"],
+            render_fn=exports["graphviz_render"],
+            free_fn=exports["graphviz_free"],
+            malloc_fn=exports["malloc"],
+            last_error_fn=exports["graphviz_last_error"],
+        )
 
-    def _malloc(self, size: int) -> int:
-        return self._malloc_fn(self._store, size)
+    @staticmethod
+    def _malloc(session: _Session, size: int) -> int:
+        return session.malloc_fn(session.store, size)
 
-    def _free(self, addr: int) -> None:
-        self._free_fn(self._store, addr)
+    @staticmethod
+    def _free(session: _Session, addr: int) -> None:
+        session.free_fn(session.store, addr)
 
-    def _write_string(self, text: str) -> int:
+    def _write_string(self, session: _Session, text: str) -> int:
         data = (text + "\x00").encode("utf-8")
-        addr = self._malloc(len(data))
-        self._mem.write(self._store, data, addr)
+        addr = self._malloc(session, len(data))
+        session.memory.write(session.store, data, addr)
         return addr
 
-    def _read_bytes(self, addr: int, length: int) -> bytes:
-        return bytes(self._mem.read(self._store, addr, addr + length))
+    @staticmethod
+    def _read_bytes(session: _Session, addr: int, length: int) -> bytes:
+        return bytes(session.memory.read(session.store, addr, addr + length))
 
-    def _read_cstring(self, addr: int, max_len: int = 4096) -> str:
-        buf = self._mem.read(self._store, addr, addr + max_len)
+    @staticmethod
+    def _read_cstring(session: _Session, addr: int, max_len: int = 4096) -> str:
+        buf = session.memory.read(session.store, addr, addr + max_len)
         nul = buf.find(0)
         if nul >= 0:
             buf = buf[:nul]
         return bytes(buf).decode("utf-8", errors="replace")
 
-    def _read_u32(self, addr: int) -> int:
-        return struct.unpack("<I", self._mem.read(self._store, addr, addr + 4))[0]
+    @staticmethod
+    def _read_u32(session: _Session, addr: int) -> int:
+        return struct.unpack("<I", session.memory.read(session.store, addr, addr + 4))[
+            0
+        ]
 
     def render(
-        self, dot_source: str, *, format: str = "svg", engine: str = "dot"
+        self,
+        dot_source: str,
+        *,
+        format: str = "svg",
+        engine: str = "dot",
+        assets: Mapping[str, bytes | bytearray | memoryview] | None = None,
     ) -> bytes:
         """Render a DOT string to the requested format."""
-        dot_ptr = self._write_string(dot_source)
-        fmt_ptr = self._write_string(format)
-        engine_ptr = self._write_string(engine)
-        out_len_ptr = self._malloc(4)
+        with staged_assets(assets) as staged:
+            session = (
+                self._session
+                if staged.directory is None
+                else self._create_session(staged.directory)
+            )
+            output = self._render_in_session(session, dot_source, format, engine)
+            if is_svg_output_format(format) and staged.files:
+                return embed_svg_assets(output, staged.files)
+            return output
+
+    def _render_in_session(
+        self, session: _Session, dot_source: str, format: str, engine: str
+    ) -> bytes:
+        dot_ptr = self._write_string(session, dot_source)
+        fmt_ptr = self._write_string(session, format)
+        engine_ptr = self._write_string(session, engine)
+        out_len_ptr = self._malloc(session, 4)
 
         try:
-            result_ptr = self._render_fn(
-                self._store, dot_ptr, fmt_ptr, engine_ptr, out_len_ptr
+            result_ptr = session.render_fn(
+                session.store, dot_ptr, fmt_ptr, engine_ptr, out_len_ptr
             )
 
             if result_ptr == 0:
-                err_ptr = self._last_error_fn(self._store)
-                error = self._read_cstring(err_ptr)
+                err_ptr = session.last_error_fn(session.store)
+                error = self._read_cstring(session, err_ptr)
                 raise RenderError(error or "Graphviz rendering failed")
 
-            out_len = self._read_u32(out_len_ptr)
+            out_len = self._read_u32(session, out_len_ptr)
             try:
-                return self._read_bytes(result_ptr, out_len)
+                return self._read_bytes(session, result_ptr, out_len)
             finally:
-                self._free(result_ptr)
+                self._free(session, result_ptr)
         finally:
-            self._free(dot_ptr)
-            self._free(fmt_ptr)
-            self._free(engine_ptr)
-            self._free(out_len_ptr)
+            self._free(session, dot_ptr)
+            self._free(session, fmt_ptr)
+            self._free(session, engine_ptr)
+            self._free(session, out_len_ptr)

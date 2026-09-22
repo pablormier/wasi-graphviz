@@ -1,5 +1,6 @@
 """wasi-graphviz – run Graphviz compiled to WebAssembly from Python."""
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Union
 
@@ -17,12 +18,13 @@ __all__ = [
     "BackendNotAvailable",
 ]
 
-_backends: dict[str, object] = {}
+_backends: dict[tuple[str, Path], object] = {}
 
 
 def _get_backend(name: str, wasm_path: Path):
     """Lazy-load and cache a backend instance."""
-    if name not in _backends:
+    key = (name, wasm_path.resolve())
+    if key not in _backends:
         if name == "pywasm":
             try:
                 from wasi_graphviz.backends.pywasm_backend import PywasmBackend
@@ -30,7 +32,7 @@ def _get_backend(name: str, wasm_path: Path):
                 raise BackendNotAvailable(
                     "pywasm is not installed. Install it with: uv add pywasm"
                 ) from exc
-            _backends[name] = PywasmBackend(wasm_path)
+            _backends[key] = PywasmBackend(wasm_path)
         elif name == "wasmtime":
             try:
                 from wasi_graphviz.backends.wasmtime_backend import WasmtimeBackend
@@ -38,10 +40,10 @@ def _get_backend(name: str, wasm_path: Path):
                 raise BackendNotAvailable(
                     "wasmtime is not installed. Install it with: uv add wasmtime"
                 ) from exc
-            _backends[name] = WasmtimeBackend(wasm_path)
+            _backends[key] = WasmtimeBackend(wasm_path)
         else:
             raise ValueError(f"Unknown backend: {name}")
-    return _backends[name]
+    return _backends[key]
 
 
 def render(
@@ -51,6 +53,7 @@ def render(
     engine: str = "dot",
     backend: str = "auto",
     wasm_path: Union[str, Path, None] = None,
+    assets: Mapping[str, bytes | bytearray | memoryview] | None = None,
 ) -> bytes:
     """Render a DOT string to the requested image format.
 
@@ -72,6 +75,15 @@ def render(
     wasm_path:
         Override the path to the ``graphviz.wasm`` artifact.
         Defaults to the vendored copy shipped with the package.
+    assets:
+        Optional files made available to Graphviz for this render. Keys are
+        portable ASCII relative paths under ``/assets`` and values are file
+        contents. Reference them from DOT with paths such as
+        ``/assets/glyph.svg``. For SVG output, referenced SVG, PNG, GIF, and
+        JPEG assets are embedded in the returned SVG as data URIs. Embedding
+        applies to Graphviz formats whose base selector is ``svg`` or
+        ``svg_inline`` (for example, ``svg:svg:core``), and to image references
+        resolved through the graph's ``imagepath`` attribute.
 
     Returns
     -------
@@ -84,6 +96,9 @@ def render(
         If Graphviz cannot render the input.
     BackendNotAvailable
         If the requested backend is not installed.
+    ValueError
+        If an asset path is unsafe or an SVG image asset has an unsupported
+        extension, or a relative SVG image reference is ambiguous.
     """
     path = Path(wasm_path) if wasm_path else PACKAGE_WASM_PATH
 
@@ -91,7 +106,7 @@ def render(
         for candidate in ("wasmtime", "pywasm"):
             try:
                 return _get_backend(candidate, path).render(
-                    dot_source, format=format, engine=engine
+                    dot_source, format=format, engine=engine, assets=assets
                 )
             except BackendNotAvailable:
                 continue
@@ -99,4 +114,6 @@ def render(
             "No WASM backend is available. Install at least one of: wasmtime, pywasm"
         )
 
-    return _get_backend(backend, path).render(dot_source, format=format, engine=engine)
+    return _get_backend(backend, path).render(
+        dot_source, format=format, engine=engine, assets=assets
+    )

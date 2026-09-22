@@ -33,7 +33,7 @@ pixi install
 pixi run build-wasm
 ```
 
-This downloads Graphviz 15.0.0 when needed, prepares the source tree, configures
+This downloads Graphviz 16.1.0 when needed, prepares the source tree, configures
 CMake for `wasm32-wasi`, builds the static libraries, links `build/graphviz.wasm`,
 validates the exports/imports, and copies the artifact to
 `src/wasi_graphviz/assets/graphviz.wasm`.
@@ -44,7 +44,7 @@ Useful options:
 # Re-extract source and recreate the CMake build directory
 pixi run build-wasm --force
 
-# Use an existing build/src/graphviz-15.0.0 source tree; do not download
+# Use an existing build/src/graphviz-16.1.0 source tree; do not download
 pixi run build-wasm --skip-download
 ```
 
@@ -55,7 +55,7 @@ The scripted task above follows these steps.
 ### 1. Download Graphviz source
 
 ```bash
-GRAPHVIZ_VERSION="15.0.0"
+GRAPHVIZ_VERSION="16.1.0"
 mkdir -p build/src
 curl -L -o build/src/graphviz.tar.gz \
   "https://gitlab.com/graphviz/graphviz/-/archive/${GRAPHVIZ_VERSION}/graphviz-${GRAPHVIZ_VERSION}.tar.gz"
@@ -263,7 +263,7 @@ Manual edits to Graphviz source files are never allowed.
 To upgrade to a new Graphviz version:
 
 ```bash
-GRAPHVIZ_VERSION="15.0.0"
+GRAPHVIZ_VERSION="16.1.0"
 # ... repeat steps 1-8 above ...
 ```
 
